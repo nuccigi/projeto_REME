@@ -99,32 +99,31 @@ def criar_mapa_pydeck(df_mapa: pd.DataFrame, titulo_mapa: str, tooltip_html: str
         zoom=12,
         pitch=0
     )
+    layer_scatter = pdk.Layer(
+        "ScatterplotLayer",
+        data=df_mapa,
+        get_position="[lon, lat]",
+        get_color="color_rgb",
+        get_radius=200,
+        pickable=True,
+        auto_highlight=True,
+        parameters={"depthTest": False},  # <-- IMPORTANTÍSSIMO
+    )
 
-   layer_scatter = pdk.Layer(
-    "ScatterplotLayer",
-    data=df_mapa,
-    get_position="[lon, lat]",
-    get_color="color_rgb",
-    get_radius=200,
-    pickable=True,
-    auto_highlight=True,
-    parameters={"depthTest": False},  # <-- IMPORTANTÍSSIMO
-   )
-
-layer_text = pdk.Layer(
-    "TextLayer",
-    data=df_mapa,
-    get_position="[lon, lat]",
-    get_text="talhao",
-    get_color=[255, 255, 255, 255],
-    get_size=22,                      # um pouco maior
-    get_alignment_baseline="bottom",
-    get_pixel_offset=[0, -18],        # sobe o texto acima do ponto
-    pickable=False,
-    parameters={"depthTest": False},  # <-- IMPORTANTÍSSIMO
-    # Se a sua versão suportar colisão, isso ajuda:
-    collision_enabled=False,
-)
+    layer_text = pdk.Layer(
+        "TextLayer",
+        data=df_mapa,
+        get_position="[lon, lat]",
+        get_text="talhao",
+        get_color=[255, 255, 255, 255],
+        get_size=22,                      # um pouco maior
+        get_alignment_baseline="bottom",
+        get_pixel_offset=[0, -18],        # sobe o texto acima do ponto
+        pickable=False,
+        parameters={"depthTest": False},  # <-- IMPORTANTÍSSIMO
+        # Se a sua versão suportar colisão, isso ajuda:
+        collision_enabled=False,
+    )
 
     st.subheader(f"🌍 {titulo_mapa}")
 
