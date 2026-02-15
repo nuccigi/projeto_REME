@@ -82,6 +82,8 @@ def criar_mapa_pydeck(df_mapa: pd.DataFrame, titulo_mapa: str, tooltip_html: str
     df_mapa = df_mapa.copy()
     df_mapa["lat"] = pd.to_numeric(df_mapa["lat"], errors="coerce")
     df_mapa["lon"] = pd.to_numeric(df_mapa["lon"], errors="coerce")
+    df_mapa["talhao"] = df_mapa["talhao"].astype(str)
+
     df_mapa = df_mapa.dropna(subset=["lat", "lon"])
 
     if df_mapa.empty:
