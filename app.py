@@ -95,15 +95,51 @@ def criar_mapa_pydeck(df_mapa, titulo_mapa, tooltip_html):
         pitch=0
     )
 
+def criar_mapa_pydeck(df_mapa, titulo_mapa, tooltip_html):
+    if df_mapa.empty:
+        st.info(f"Não há dados para exibir no mapa: {titulo_mapa}")
+        return
+
+    initial_lat = df_mapa["lat"].mean()
+    initial_lon = df_mapa["lon"].mean()
+
+    view_state = pdk.ViewState(
+        latitude=initial_lat,
+        longitude=initial_lon,
+        zoom=10,
+        pitch=0
+    )
+
     layer_scatter = pdk.Layer(
         "ScatterplotLayer",
-        df_mapa,
-        get_position=['lon', 'lat'],
+        data=df_mapa,
+        get_position='[lon, lat]',
         get_color='color_rgb',
         get_radius=200,
-        tooltip={"html": tooltip_html, "style": {"color": "white"}},
-        pickable=True
+        pickable=True,
     )
+
+    layer_text = pdk.Layer(
+        "TextLayer",
+        data=df_mapa,
+        get_position='[lon, lat]',
+        get_text='talhao',
+        get_color=[255, 255, 255, 255],
+        get_size=16,
+        get_alignment_baseline="center",
+        get_pixel_offset=[0, 0],
+    )
+
+    st.subheader(f"🌍 {titulo_mapa}")
+
+    r = pdk.Deck(
+        layers=[layer_scatter, layer_text],
+        initial_view_state=view_state,
+        map_style="mapbox://styles/mapbox/satellite-streets-v12",
+        tooltip={"html": tooltip_html, "style": {"color": "white"}},
+    )
+
+    st.pydeck_chart(r, use_container_width=True)
 
     layer_text = pdk.Layer(
         "TextLayer",
