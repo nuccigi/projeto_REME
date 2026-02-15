@@ -109,7 +109,7 @@ def criar_mapa_pydeck(df_mapa: pd.DataFrame, titulo_mapa: str, tooltip_html: str
     pickable=True,
     auto_highlight=True,
     parameters={"depthTest": False},  # <-- IMPORTANTÍSSIMO
-)
+   )
 
 layer_text = pdk.Layer(
     "TextLayer",
