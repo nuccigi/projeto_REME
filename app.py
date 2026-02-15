@@ -242,6 +242,10 @@ if arquivo is not None:
                 df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
                 df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
 
+                st.write("Talhões no mapa anual:", df_mapa_anual["talhao"].unique())
+                st.write("Qtd talhões:", df_mapa_anual["talhao"].nunique())
+
+
                 criar_mapa_pydeck(
                     df_risco_mensal,
                     f"Risco Médio Mensal em {mes_sel_completo.upper()}",
