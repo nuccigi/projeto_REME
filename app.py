@@ -9,6 +9,15 @@ from calculo import calcular_scores_mensais, carregar_base_reme
 from pesos import pesos_ahp  # ainda importado, mas não exibimos mais a tabela
 from variaveis_talhao import variaveis_talhao
 
+MAPBOX_API_KEY = "pk.eyJ1IjoibnVjY2lnaSIsImEiOiJjbWxudHJuNnEwaGpmM2tva3h4NHB5dXhkIn0.d2H1fGeOe9KcWzURkMxYBQ"
+
+import os
+
+if "MAPBOX_API_KEY" in st.secrets:
+    pdk.settings.mapbox_api_key = st.secrets["MAPBOX_API_KEY"]
+elif os.getenv("MAPBOX_API_KEY"):
+    pdk.settings.mapbox_api_key = os.getenv("MAPBOX_API_KEY")
+
 # ============================
 #   Constantes e Mapeamentos
 # ============================
