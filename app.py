@@ -24,7 +24,7 @@ R_BINS = [0, 20, 40, 60, 80, 100]  # faixas gerais (0–100)
 R_LABELS = ["R1", "R2", "R3", "R4", "R5"]
 R_MAP = {lab: i + 1 for i, lab in enumerate(R_LABELS)}  # "R1"->1, ..., "R5"->5
 R_RISK_LABELS = ["Risco Muito Baixo", "Risco Baixo", "Risco Moderado", "Risco Médio", "Risco Alto"]
-R_RISK_MAP = dict(zip(R_LABELS, R_RISK_LABELS))  # R1 -> "Risco Baixo", ...
+R_RISK_MAP = dict(zip(R_LABELS, R_RISK_LABELS))  # R1 -> "Risco Muito Baixo", ...
 
 # ============================
 #   Helpers de ordenação
@@ -72,6 +72,10 @@ def get_color_from_index(idx):
     return [255, 0, 0, 200]
 
 def criar_mapa_pydeck(df_mapa, titulo_mapa, tooltip_html):
+    """
+    - Tooltip correto no PyDeck deve ser passado no pdk.Deck(...)
+    - ScatterplotLayer precisa ser pickable=True
+    """
     if df_mapa.empty:
         st.info(f"Não há dados para exibir no mapa: {titulo_mapa}")
         return
@@ -89,22 +93,23 @@ def criar_mapa_pydeck(df_mapa, titulo_mapa, tooltip_html):
     layer_scatter = pdk.Layer(
         "ScatterplotLayer",
         df_mapa,
-        get_position=['lon', 'lat'],
-        get_color='color_rgb',
+        get_position=["lon", "lat"],
+        get_color="color_rgb",
         get_radius=200,
-        tooltip={"html": tooltip_html, "style": {"color": "white"}},
-        pickable=True
+        pickable=True,
+        auto_highlight=True,  # opcional: destaca o ponto no hover
     )
 
     layer_text = pdk.Layer(
         "TextLayer",
         df_mapa,
-        get_position=['lon', 'lat'],
-        get_text='talhao',
+        get_position=["lon", "lat"],
+        get_text="talhao",
         get_color=[255, 255, 255, 255],
         get_size=16,
         get_alignment_baseline="'center'",
-        get_pixel_offset=[0, 0]
+        get_pixel_offset=[0, 0],
+        pickable=False
     )
 
     st.subheader(f"🌍 {titulo_mapa}")
@@ -112,7 +117,8 @@ def criar_mapa_pydeck(df_mapa, titulo_mapa, tooltip_html):
     r = pdk.Deck(
         layers=[layer_scatter, layer_text],
         initial_view_state=view_state,
-        map_style="mapbox://styles/mapbox/satellite-streets-v12"
+        map_style="mapbox://styles/mapbox/satellite-streets-v12",
+        tooltip={"html": tooltip_html, "style": {"color": "white"}},  # <-- tooltip AQUI
     )
 
     st.pydeck_chart(r, use_container_width=True)
@@ -152,6 +158,9 @@ if arquivo is not None:
 
         resultado["classe_geral_idx"] = resultado["classe_geral_idx"].astype(float)
 
+        # ============================
+        #   MAPA ANUAL
+        # ============================
         df_mapa_anual = (
             resultado
             .groupby("talhao", as_index=False)
@@ -172,6 +181,7 @@ if arquivo is not None:
         df_mapa_anual["classe_media"] = class_geral_from_score(df_mapa_anual["score_medio"]).astype(str)
         df_mapa_anual["risco_medio_extenso"] = df_mapa_anual["classe_media"].map(R_RISK_MAP)
 
+        # base para mapa mensal
         df_mapa_mensal_base = resultado.copy()
 
     except Exception as e:
@@ -185,6 +195,9 @@ if arquivo is not None:
 
     col_mapa_anual, col_mapa_mensal = st.columns(2)
 
+    # ============================
+    #   MAPA MENSAL
+    # ============================
     with col_mapa_mensal:
         ordem_meses_disponiveis = df_mapa_mensal_base["mes"].astype(str).unique().tolist()
         meses_abreviados_disponiveis = [m.split('_')[0] for m in ordem_meses_disponiveis]
@@ -218,16 +231,23 @@ if arquivo is not None:
             criar_mapa_pydeck(
                 df_risco_mensal,
                 f"Risco Médio Mensal em {mes_sel_completo.upper()}",
-                "<b>Talhão:</b> {talhao}<br/><b>Risco Mensal:</b> {score_mensal:.1f}<br/><b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
+                "<b>Talhão:</b> {talhao}<br/>"
+                "<b>Score (mês):</b> {score_mensal:.1f}<br/>"
+                "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
             )
         else:
             st.info(f"Não há dados de risco para o mês de {mes_sel_completo.upper()}.")
 
+    # ============================
+    #   MAPA ANUAL + SELECT TALHÃO
+    # ============================
     with col_mapa_anual:
         criar_mapa_pydeck(
             df_mapa_anual,
             "Risco Médio Anual por Talhão",
-            "<b>Talhão:</b> {talhao}<br/><b>Risco Médio:</b> {score_medio:.1f}<br/><b>Classe:</b> {classe_media} ({risco_medio_extenso})"
+            "<b>Talhão:</b> {talhao}<br/>"
+            "<b>Score (médio):</b> {score_medio:.1f}<br/>"
+            "<b>Classe:</b> {classe_media} ({risco_medio_extenso})"
         )
         st.markdown("---")
         talhao_sel = st.selectbox("Selecione o talhão para Detalhes:", talhoes)
@@ -239,6 +259,9 @@ if arquivo is not None:
 
     col1, col2 = st.columns([3, 2])
 
+    # ============================
+    #   GRÁFICO HISTÓRICO (ALTAIR)
+    # ============================
     with col1:
         ordem_meses = MESES_ABREVIADOS
         df_t = df_talhao[df_talhao["mes"].str.startswith(tuple(ordem_meses))].copy()
@@ -247,8 +270,8 @@ if arquivo is not None:
         df_t["mes_simples"] = pd.Categorical(df_t["mes_simples"], categories=ordem_meses, ordered=True)
         df_t = df_t.sort_values("mes_simples")
 
-        for col in ["classe_geral_idx", "score"]:
-            df_t[col] = pd.to_numeric(df_t[col], errors='coerce')
+        for c in ["classe_geral_idx", "score"]:
+            df_t[c] = pd.to_numeric(df_t[c], errors="coerce")
 
         if df_t.empty:
             st.info("Não há dados válidos para este talhão.")
@@ -287,10 +310,12 @@ if arquivo is not None:
                 .encode(
                     x=x_axis,
                     y=y_geral,
-                    color=alt.Color("classe_geral:N",
-                                    scale=alt.Scale(domain=R_LABELS,
-                                                    range=["#7fbf7b", "#c2e699", "#fec44f", "#fe9929", "#e31a1c"]),
-                                    legend=alt.Legend(title="Classe geral")),
+                    color=alt.Color(
+                        "classe_geral:N",
+                        scale=alt.Scale(domain=R_LABELS,
+                                        range=["#7fbf7b", "#c2e699", "#fec44f", "#fe9929", "#e31a1c"]),
+                        legend=alt.Legend(title="Classe geral")
+                    ),
                     tooltip=[
                         alt.Tooltip("mes_completo:O", title="Mês"),
                         alt.Tooltip("score:Q", title="Score", format=".1f"),
@@ -312,13 +337,16 @@ if arquivo is not None:
 
             st.altair_chart(graf_geral + rot_geral, use_container_width=True)
 
+    # ============================
+    #   RESUMO + VARIÁVEIS FIXAS
+    # ============================
     with col2:
         resumo_anual = df_mapa_anual[df_mapa_anual["talhao"] == str(talhao_sel)].iloc[0]
 
         st.subheader("🏷️ Classificação Média Anual")
 
-        classe_media = resumo_anual['classe_media']
-        risco_extenso = resumo_anual['risco_medio_extenso']
+        classe_media = resumo_anual["classe_media"]
+        risco_extenso = resumo_anual["risco_medio_extenso"]
 
         if classe_media in ["R1", "R2"]:
             st.success(f"🟢 **{risco_extenso}** ({classe_media})")
@@ -352,5 +380,6 @@ if arquivo is not None:
 
 else:
     st.info("Envie a planilha para iniciar o cálculo.")
+
 
 
