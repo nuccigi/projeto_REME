@@ -205,7 +205,7 @@ talhoes = sorted(
 )
 
 # ============================================================
-#   PÁGINA 1: VISÃO GERAL
+#   PÁGINAS (VISÃO GERAL vs VISÃO DETALHADA)
 # ============================================================
 if pagina == "Visão Geral":
     st.subheader("📌 Visão Geral")
@@ -218,36 +218,30 @@ if pagina == "Visão Geral":
         "<b>Score (médio):</b> {score_medio}<br/>"
         "<b>Classe:</b> {classe_media} ({risco_medio_extenso})"
     )
+
     st.markdown("---")
-st.subheader("📋 Talhões por Classificação de Risco")
+    st.subheader("📋 Talhões por Classificação de Risco")
 
-for classe in ["R5", "R4", "R3", "R2", "R1"]:
+    for classe in ["R5", "R4", "R3", "R2", "R1"]:
+        df_classe = (
+            df_mapa_anual[df_mapa_anual["classe_media"] == classe]
+            .sort_values("score_medio", ascending=False)
+            .loc[:, ["talhao", "score_medio", "classe_media", "risco_medio_extenso"]]
+            .reset_index(drop=True)
+        )
 
-    df_classe = (
-        df_mapa_anual[df_mapa_anual["classe_media"] == classe]
-        .sort_values("score_medio", ascending=False)
-        .loc[:, ["talhao", "score_medio", "classe_media", "risco_medio_extenso"]]
-        .reset_index(drop=True)
-    )
+        st.markdown(f"### {classe} — {R_RISK_MAP.get(classe, '')}")
 
-    st.markdown(
-        f"### {classe} — {R_RISK_MAP.get(classe, '')}"
-    )
-
-    # ✅ Se estiver vazio, mostra mensagem
-    if df_classe.empty:
-        st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
-    else:
-        # ✅ Melhorando nomes das colunas
-        df_classe = df_classe.rename(columns={
-            "talhao": "Talhão",
-            "score_medio": "Score Médio Anual",
-            "classe_media": "Classe",
-            "risco_medio_extenso": "Descrição do Risco"
-        })
-
-        st.dataframe(df_classe, use_container_width=True, hide_index=True)
-
+        if df_classe.empty:
+            st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
+        else:
+            df_classe = df_classe.rename(columns={
+                "talhao": "Talhão",
+                "score_medio": "Score Médio Anual",
+                "classe_media": "Classe",
+                "risco_medio_extenso": "Descrição do Risco"
+            })
+            st.dataframe(df_classe, use_container_width=True, hide_index=True)
 
 # ============================================================
 #   PÁGINA 2: VISÃO DETALHADA DO TALHÃO
@@ -260,7 +254,7 @@ else:
 
     st.markdown("---")
 
-    # Mapa mensal fixo em JANEIRO (como você pediu)
+    # Mapa mensal fixo em JANEIRO
     mes_fixado_completo = "Janeiro"
     mes_fixado_abrev = "jan"
 
@@ -300,9 +294,6 @@ else:
 
     col1, col2 = st.columns([3, 2])
 
-    # ----------------------------
-    # Gráfico: risco médio histórico por mês (talhão)
-    # ----------------------------
     with col1:
         ordem_meses = MESES_ABREVIADOS
         df_t = df_talhao[df_talhao["mes"].astype(str).str.startswith(tuple(ordem_meses))].copy()
@@ -317,9 +308,7 @@ else:
         if df_t.empty:
             st.info("Não há dados válidos para este talhão.")
         else:
-            base = df_t.groupby("mes_simples", as_index=False).agg(
-                score=("score", "mean"),
-            )
+            base = df_t.groupby("mes_simples", as_index=False).agg(score=("score", "mean"))
             base["score"] = pd.to_numeric(base["score"], errors="coerce")
             base["classe_geral"] = class_geral_from_score(base["score"]).astype(str)
             base["classe_geral_idx"] = base["classe_geral"].map(R_MAP)
@@ -378,9 +367,6 @@ else:
 
             st.altair_chart(graf_geral + rot_geral, use_container_width=True)
 
-    # ----------------------------
-    # Classificação média anual + variáveis fixas
-    # ----------------------------
     with col2:
         linha_anual = df_mapa_anual[df_mapa_anual["talhao"] == str(talhao_sel)]
         if linha_anual.empty:
@@ -422,6 +408,7 @@ else:
                     st.markdown(f"- <span style='color:#ff4b4b'>❌ {nome_bonito}</span>", unsafe_allow_html=True)
         else:
             st.info("Nenhuma variável cadastrada para este talhão.")
+
 
 
 
