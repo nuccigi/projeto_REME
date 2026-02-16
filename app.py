@@ -218,24 +218,36 @@ if pagina == "Visão Geral":
         "<b>Score (médio):</b> {score_medio}<br/>"
         "<b>Classe:</b> {classe_media} ({risco_medio_extenso})"
     )
-
     st.markdown("---")
-    st.subheader("📋 Talhões por Classificação (ordenado por maior risco e score)")
+st.subheader("📋 Talhões por Classificação de Risco")
 
-    # 5 tabelas (uma por classe), ordenadas por score_medio desc
-    for classe in ["R5", "R4", "R3", "R2", "R1"]:
-        df_classe = (
-            df_mapa_anual[df_mapa_anual["classe_media"] == classe]
-            .sort_values("score_medio", ascending=False)
-            .loc[:, ["talhao", "score_medio", "classe_media", "risco_medio_extenso"]]
-            .reset_index(drop=True)
-        )
+for classe in ["R5", "R4", "R3", "R2", "R1"]:
 
-        st.markdown(
-            f"#### {classe} — {R_RISK_MAP.get(classe, '')}",
-            unsafe_allow_html=False
-        )
+    df_classe = (
+        df_mapa_anual[df_mapa_anual["classe_media"] == classe]
+        .sort_values("score_medio", ascending=False)
+        .loc[:, ["talhao", "score_medio", "classe_media", "risco_medio_extenso"]]
+        .reset_index(drop=True)
+    )
+
+    st.markdown(
+        f"### {classe} — {R_RISK_MAP.get(classe, '')}"
+    )
+
+    # ✅ Se estiver vazio, mostra mensagem
+    if df_classe.empty:
+        st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
+    else:
+        # ✅ Melhorando nomes das colunas
+        df_classe = df_classe.rename(columns={
+            "talhao": "Talhão",
+            "score_medio": "Score Médio Anual",
+            "classe_media": "Classe",
+            "risco_medio_extenso": "Descrição do Risco"
+        })
+
         st.dataframe(df_classe, use_container_width=True, hide_index=True)
+
 
 # ============================================================
 #   PÁGINA 2: VISÃO DETALHADA DO TALHÃO
