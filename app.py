@@ -215,7 +215,7 @@ if pagina == "Visão Geral":
         df_mapa_anual,
         "Risco Médio Anual por Talhão",
         "<b>Talhão:</b> {talhao}<br/>"
-        "<b>Score (médio):</b> {score_medio}<br/>"
+        "<b>Score:</b> {score_medio}<br/>"
         "<b>Classe:</b> {classe_media} ({risco_medio_extenso})"
     )
 
