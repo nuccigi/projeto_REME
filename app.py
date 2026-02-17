@@ -45,7 +45,6 @@ R_RISK_MAP = dict(zip(R_LABELS, R_RISK_LABELS))
 # ============================
 #   Paleta (tons mais diferentes)
 # ============================
-# (cores bem distintas, evitando "degradê")
 R_COLORS_HEX = {
     "R1": "#2E7D32",  # verde escuro
     "R2": "#1E88E5",  # azul
@@ -78,7 +77,6 @@ def add_reclassificacoes(df_resultado: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def cor_por_classe(classe: str):
-    # fallback seguro
     return R_COLORS_RGB.get(str(classe), [120, 120, 120, 200])
 
 # ============================
@@ -139,7 +137,7 @@ st.title("🔥 Risco de Incêndios - Fazenda Sabiá e Lagoa dos Buritis")
 st.sidebar.title("📌 Navegação")
 pagina = st.sidebar.radio("Escolha a visão:", ["Visão Geral", "Visão Detalhada (Talhão)"], index=0)
 
-# Legenda (mantém nas duas páginas)
+# Legenda
 st.markdown("### Legenda de Classificação de Risco")
 col_legendas = st.columns(len(R_LABELS))
 for i, label in enumerate(R_LABELS):
@@ -170,9 +168,7 @@ try:
     resultado = add_reclassificacoes(resultado_raw)
     resultado["classe_geral_idx"] = resultado["classe_geral_idx"].astype(float)
 
-    # ============================
-    #   MAPA ANUAL (base)
-    # ============================
+    # ---- mapa anual
     df_mapa_anual = (
         resultado
         .groupby("talhao", as_index=False)
@@ -205,17 +201,16 @@ talhoes = sorted(
 )
 
 # ============================================================
-#   PÁGINAS (VISÃO GERAL vs VISÃO DETALHADA)
+#   PÁGINAS
 # ============================================================
 if pagina == "Visão Geral":
     st.subheader("📌 Visão Geral")
 
-    # Mapa anual
     criar_mapa_pydeck(
         df_mapa_anual,
         "Risco Médio Anual por Talhão",
         "<b>Talhão:</b> {talhao}<br/>"
-        "<b>Score:</b> {score_medio}<br/>"
+        "<b>Score (médio):</b> {score_medio}<br/>"
         "<b>Classe:</b> {classe_media} ({risco_medio_extenso})"
     )
 
@@ -229,34 +224,18 @@ if pagina == "Visão Geral":
             .loc[:, ["talhao", "score_medio", "classe_media", "risco_medio_extenso"]]
             .reset_index(drop=True)
         )
-        
+
         cor = R_COLORS_HEX.get(classe, "#999999")
         st.markdown(
             f"""
-            <div style="
-                display:flex;
-                align-items:center;
-                gap:10px;
-                margin: 18px 0 8px 0;
-            ">
-              <span style="
-                  background:{cor};
-                  color:white;
-                  padding:6px 10px;
-                  border-radius:10px;
-                  font-weight:700;
-                  font-size:16px;
-             ">{classe}</span>
-             <span style="
-                 font-size:26px;
-                 font-weight:800;
-                 line-height:1;
-             ">— {R_RISK_MAP.get(classe, '')}</span>
+            <div style="display:flex; align-items:center; gap:10px; margin: 18px 0 8px 0;">
+              <span style="background:{cor}; color:white; padding:6px 10px; border-radius:10px;
+                           font-weight:700; font-size:16px;">{classe}</span>
+              <span style="font-size:26px; font-weight:800; line-height:1;">— {R_RISK_MAP.get(classe, '')}</span>
             </div>
             """,
             unsafe_allow_html=True
         )
-
 
         if df_classe.empty:
             st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
@@ -269,71 +248,63 @@ if pagina == "Visão Geral":
             })
             st.dataframe(df_classe, use_container_width=True, hide_index=True)
 
-# ============================================================
-#   PÁGINA 2: VISÃO DETALHADA DO TALHÃO
-# ============================================================
 else:
     st.subheader("🔎 Visão Detalhada do Talhão")
 
-    # Seletor do talhão
     talhao_sel = st.selectbox("Selecione o talhão para Detalhes:", talhoes)
-
     st.markdown("---")
 
     # ============================
-#   Mapa mensal (selecionável)
-# ============================
-ordem_meses_disponiveis = df_mapa_mensal_base["mes"].astype(str).unique().tolist()
-meses_abreviados_disponiveis = [m.split("_")[0] for m in ordem_meses_disponiveis]
+    #   Mapa mensal (selecionável)  ✅ (indentado dentro do else!)
+    # ============================
+    ordem_meses_disponiveis = df_mapa_mensal_base["mes"].astype(str).unique().tolist()
+    meses_abreviados_disponiveis = [m.split("_")[0] for m in ordem_meses_disponiveis]
 
-meses_selecionaveis = [
-    MAP_MES_ABREV_TO_COMPLETO[m]
-    for m in MESES_ABREVIADOS
-    if m in meses_abreviados_disponiveis
-]
+    meses_selecionaveis = [
+        MAP_MES_ABREV_TO_COMPLETO[m]
+        for m in MESES_ABREVIADOS
+        if m in meses_abreviados_disponiveis
+    ]
 
-if not meses_selecionaveis:
-    st.info("Não há meses disponíveis para exibir no mapa mensal.")
-else:
-    mes_sel_completo = st.selectbox("Selecione o mês para o mapa:", meses_selecionaveis, index=0)
-    mes_sel_abrev = MAP_MES_COMPLETO_TO_ABREV[mes_sel_completo]
-
-    df_risco_mensal = (
-        df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_sel_abrev)]
-        .groupby("talhao", as_index=False)
-        .agg(
-            lat=("lat", "first"),
-            lon=("lon", "first"),
-            score_mensal=("score", "mean"),
-        )
-    )
-
-    df_risco_mensal["talhao"] = df_risco_mensal["talhao"].astype(str)
-    df_risco_mensal = df_risco_mensal.dropna(subset=["lat", "lon"])
-
-    if not df_risco_mensal.empty:
-        df_risco_mensal["score_mensal"] = pd.to_numeric(df_risco_mensal["score_mensal"], errors="coerce").round(1)
-        df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
-        df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
-        df_risco_mensal["color_rgb"] = df_risco_mensal["classe_mensal"].apply(cor_por_classe)
-
-        criar_mapa_pydeck(
-            df_risco_mensal,
-            f"Risco Médio Mensal em {mes_sel_completo.upper()}",
-            "<b>Talhão:</b> {talhao}<br/>"
-            "<b>Score (mês):</b> {score_mensal}<br/>"
-            "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
-        )
+    if not meses_selecionaveis:
+        st.info("Não há meses disponíveis para exibir no mapa mensal.")
     else:
-        st.info(f"Não há dados para exibir o mapa mensal de {mes_sel_completo.upper()}.")
+        mes_sel_completo = st.selectbox("Selecione o mês para o mapa:", meses_selecionaveis, index=0)
+        mes_sel_abrev = MAP_MES_COMPLETO_TO_ABREV[mes_sel_completo]
 
+        df_risco_mensal = (
+            df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_sel_abrev)]
+            .groupby("talhao", as_index=False)
+            .agg(
+                lat=("lat", "first"),
+                lon=("lon", "first"),
+                score_mensal=("score", "mean"),
+            )
+        )
 
+        df_risco_mensal["talhao"] = df_risco_mensal["talhao"].astype(str)
+        df_risco_mensal = df_risco_mensal.dropna(subset=["lat", "lon"])
+
+        if not df_risco_mensal.empty:
+            df_risco_mensal["score_mensal"] = pd.to_numeric(df_risco_mensal["score_mensal"], errors="coerce").round(1)
+            df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
+            df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
+            df_risco_mensal["color_rgb"] = df_risco_mensal["classe_mensal"].apply(cor_por_classe)
+
+            criar_mapa_pydeck(
+                df_risco_mensal,
+                f"Risco Médio Mensal em {mes_sel_completo.upper()}",
+                "<b>Talhão:</b> {talhao}<br/>"
+                "<b>Score (mês):</b> {score_mensal}<br/>"
+                "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
+            )
+        else:
+            st.info(f"Não há dados para exibir o mapa mensal de {mes_sel_completo.upper()}.")
 
     st.markdown("---")
     st.subheader(f"Detalhes do Talhão {talhao_sel}:")
 
     df_talhao = resultado[resultado["talhao"].astype(str) == str(talhao_sel)].copy()
-
     col1, col2 = st.columns([3, 2])
 
     with col1:
@@ -344,8 +315,7 @@ else:
         df_t["mes_simples"] = pd.Categorical(df_t["mes_simples"], categories=ordem_meses, ordered=True)
         df_t = df_t.sort_values("mes_simples")
 
-        for c in ["classe_geral_idx", "score"]:
-            df_t[c] = pd.to_numeric(df_t[c], errors="coerce")
+        df_t["score"] = pd.to_numeric(df_t["score"], errors="coerce")
 
         if df_t.empty:
             st.info("Não há dados válidos para este talhão.")
@@ -415,7 +385,6 @@ else:
             st.info("Não foi possível calcular o resumo anual deste talhão.")
         else:
             resumo_anual = linha_anual.iloc[0]
-
             st.subheader("🏷️ Classificação Média Anual")
 
             classe_media = resumo_anual["classe_media"]
