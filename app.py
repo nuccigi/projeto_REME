@@ -280,12 +280,26 @@ else:
 
     st.markdown("---")
 
-    # Mapa mensal fixo em JANEIRO
-    mes_fixado_completo = "Janeiro"
-    mes_fixado_abrev = "jan"
+    # ============================
+#   Mapa mensal (selecionável)
+# ============================
+ordem_meses_disponiveis = df_mapa_mensal_base["mes"].astype(str).unique().tolist()
+meses_abreviados_disponiveis = [m.split("_")[0] for m in ordem_meses_disponiveis]
 
-    df_risco_janeiro = (
-        df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_fixado_abrev)]
+meses_selecionaveis = [
+    MAP_MES_ABREV_TO_COMPLETO[m]
+    for m in MESES_ABREVIADOS
+    if m in meses_abreviados_disponiveis
+]
+
+if not meses_selecionaveis:
+    st.info("Não há meses disponíveis para exibir no mapa mensal.")
+else:
+    mes_sel_completo = st.selectbox("Selecione o mês para o mapa:", meses_selecionaveis, index=0)
+    mes_sel_abrev = MAP_MES_COMPLETO_TO_ABREV[mes_sel_completo]
+
+    df_risco_mensal = (
+        df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_sel_abrev)]
         .groupby("talhao", as_index=False)
         .agg(
             lat=("lat", "first"),
@@ -294,24 +308,26 @@ else:
         )
     )
 
-    df_risco_janeiro["talhao"] = df_risco_janeiro["talhao"].astype(str)
-    df_risco_janeiro = df_risco_janeiro.dropna(subset=["lat", "lon"])
+    df_risco_mensal["talhao"] = df_risco_mensal["talhao"].astype(str)
+    df_risco_mensal = df_risco_mensal.dropna(subset=["lat", "lon"])
 
-    if not df_risco_janeiro.empty:
-        df_risco_janeiro["score_mensal"] = pd.to_numeric(df_risco_janeiro["score_mensal"], errors="coerce").round(1)
-        df_risco_janeiro["classe_mensal"] = class_geral_from_score(df_risco_janeiro["score_mensal"]).astype(str)
-        df_risco_janeiro["risco_mensal_extenso"] = df_risco_janeiro["classe_mensal"].map(R_RISK_MAP)
-        df_risco_janeiro["color_rgb"] = df_risco_janeiro["classe_mensal"].apply(cor_por_classe)
+    if not df_risco_mensal.empty:
+        df_risco_mensal["score_mensal"] = pd.to_numeric(df_risco_mensal["score_mensal"], errors="coerce").round(1)
+        df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
+        df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
+        df_risco_mensal["color_rgb"] = df_risco_mensal["classe_mensal"].apply(cor_por_classe)
 
         criar_mapa_pydeck(
-            df_risco_janeiro,
-            f"Risco Médio Mensal em {mes_fixado_completo.upper()}",
+            df_risco_mensal,
+            f"Risco Médio Mensal em {mes_sel_completo.upper()}",
             "<b>Talhão:</b> {talhao}<br/>"
             "<b>Score (mês):</b> {score_mensal}<br/>"
             "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
         )
     else:
-        st.info("Não há dados para exibir o mapa mensal de JANEIRO.")
+        st.info(f"Não há dados para exibir o mapa mensal de {mes_sel_completo.upper()}.")
+
+
 
     st.markdown("---")
     st.subheader(f"Detalhes do Talhão {talhao_sel}:")
