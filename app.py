@@ -230,7 +230,34 @@ if pagina == "Visão Geral":
             .reset_index(drop=True)
         )
 
-        st.markdown(f"### {classe} — {R_RISK_MAP.get(classe, '')}")
+        cor = R_COLORS_HEX.get(classe, "#999999")
+st.markdown(
+    f"""
+    <div style="
+        display:flex;
+        align-items:center;
+        gap:10px;
+        margin: 18px 0 8px 0;
+    ">
+      <span style="
+          background:{cor};
+          color:white;
+          padding:6px 10px;
+          border-radius:10px;
+          font-weight:700;
+          font-size:16px;
+      ">{classe}</span>
+
+      <span style="
+          font-size:26px;
+          font-weight:800;
+          line-height:1;
+      ">— {R_RISK_MAP.get(classe, '')}</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
         if df_classe.empty:
             st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
