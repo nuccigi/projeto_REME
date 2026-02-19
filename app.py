@@ -79,6 +79,24 @@ def add_reclassificacoes(df_resultado: pd.DataFrame) -> pd.DataFrame:
 def cor_por_classe(classe: str):
     return R_COLORS_RGB.get(str(classe), [120, 120, 120, 200])
 
+def titulo_badge(classe: str, texto: str, tamanho_texto_px: int = 22):
+    """
+    Renderiza um título com badge colorida (R1..R5) + texto ao lado.
+    """
+    cor = R_COLORS_HEX.get(classe, "#999999")
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:10px; margin: 18px 0 8px 0;">
+          <span style="background:{cor}; color:white; padding:6px 10px; border-radius:10px;
+                       font-weight:700; font-size:16px;">{classe}</span>
+          <span style="font-size:{tamanho_texto_px}px; font-weight:800; line-height:1;">
+            — {texto}
+          </span>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 # ============================
 #   Funções de Mapa (PyDeck)
 # ============================
@@ -215,7 +233,7 @@ if pagina == "Visão Geral":
     )
 
     st.markdown("---")
-    st.subheader("📋 Talhões por Classificação de Risco")
+    st.subheader("📋 Talhões por Classificação de Risco (ANUAL)")
 
     for classe in ["R5", "R4", "R3", "R2", "R1"]:
         df_classe = (
@@ -225,17 +243,7 @@ if pagina == "Visão Geral":
             .reset_index(drop=True)
         )
 
-        cor = R_COLORS_HEX.get(classe, "#999999")
-        st.markdown(
-            f"""
-            <div style="display:flex; align-items:center; gap:10px; margin: 18px 0 8px 0;">
-              <span style="background:{cor}; color:white; padding:6px 10px; border-radius:10px;
-                           font-weight:700; font-size:16px;">{classe}</span>
-              <span style="font-size:26px; font-weight:800; line-height:1;">— {R_RISK_MAP.get(classe, '')}</span>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
+        titulo_badge(classe, R_RISK_MAP.get(classe, ""), tamanho_texto_px=26)
 
         if df_classe.empty:
             st.info(f"Não há talhões classificados como {classe} ({R_RISK_MAP.get(classe, '')}).")
@@ -255,7 +263,7 @@ else:
     st.markdown("---")
 
     # ============================
-    #   Mapa mensal (selecionável)  ✅ (indentado dentro do else!)
+    #   Mapa mensal (selecionável)
     # ============================
     ordem_meses_disponiveis = df_mapa_mensal_base["mes"].astype(str).unique().tolist()
     meses_abreviados_disponiveis = [m.split("_")[0] for m in ordem_meses_disponiveis]
@@ -268,47 +276,42 @@ else:
 
     if not meses_selecionaveis:
         st.info("Não há meses disponíveis para exibir no mapa mensal.")
-    else:
-        mes_sel_completo = st.selectbox("Selecione o mês para o mapa:", meses_selecionaveis, index=0)
-        mes_sel_abrev = MAP_MES_COMPLETO_TO_ABREV[mes_sel_completo]
+        st.stop()
 
-        df_risco_mensal = (
-            df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_sel_abrev)]
-            .groupby("talhao", as_index=False)
-            .agg(
-                lat=("lat", "first"),
-                lon=("lon", "first"),
-                score_mensal=("score", "mean"),
-            )
+    mes_sel_completo = st.selectbox("Selecione o mês para o mapa:", meses_selecionaveis, index=0)
+    mes_sel_abrev = MAP_MES_COMPLETO_TO_ABREV[mes_sel_completo]
+
+    df_risco_mensal = (
+        df_mapa_mensal_base[df_mapa_mensal_base["mes"].astype(str).str.startswith(mes_sel_abrev)]
+        .groupby("talhao", as_index=False)
+        .agg(
+            lat=("lat", "first"),
+            lon=("lon", "first"),
+            score_mensal=("score", "mean"),
+        )
+    )
+
+    df_risco_mensal["talhao"] = df_risco_mensal["talhao"].astype(str)
+    df_risco_mensal = df_risco_mensal.dropna(subset=["lat", "lon"])
+
+    if df_risco_mensal.empty:
+        st.info(f"Não há dados para exibir o mapa mensal de {mes_sel_completo.upper()}.")
+    else:
+        df_risco_mensal["score_mensal"] = pd.to_numeric(df_risco_mensal["score_mensal"], errors="coerce").round(1)
+        df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
+        df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
+        df_risco_mensal["color_rgb"] = df_risco_mensal["classe_mensal"].apply(cor_por_classe)
+
+        criar_mapa_pydeck(
+            df_risco_mensal,
+            f"Risco Médio Mensal em {mes_sel_completo.upper()}",
+            "<b>Talhão:</b> {talhao}<br/>"
+            "<b>Score (mês):</b> {score_mensal}<br/>"
+            "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
         )
 
-        df_risco_mensal["talhao"] = df_risco_mensal["talhao"].astype(str)
-        df_risco_mensal = df_risco_mensal.dropna(subset=["lat", "lon"])
-
-        if not df_risco_mensal.empty:
-            df_risco_mensal["score_mensal"] = pd.to_numeric(df_risco_mensal["score_mensal"], errors="coerce").round(1)
-            df_risco_mensal["classe_mensal"] = class_geral_from_score(df_risco_mensal["score_mensal"]).astype(str)
-            df_risco_mensal["risco_mensal_extenso"] = df_risco_mensal["classe_mensal"].map(R_RISK_MAP)
-            df_risco_mensal["color_rgb"] = df_risco_mensal["classe_mensal"].apply(cor_por_classe)
-
-            criar_mapa_pydeck(
-                df_risco_mensal,
-                f"Risco Médio Mensal em {mes_sel_completo.upper()}",
-                "<b>Talhão:</b> {talhao}<br/>"
-                "<b>Score (mês):</b> {score_mensal}<br/>"
-                "<b>Classe:</b> {classe_mensal} ({risco_mensal_extenso})"
-            )
-        else:
-            st.info(f"Não há dados para exibir o mapa mensal de {mes_sel_completo.upper()}.")
-
-    st.markdown("---")
-    st.subheader(f"Detalhes do Talhão {talhao_sel}:")
-
-    df_talhao = resultado[resultado["talhao"].astype(str) == str(talhao_sel)].copy()
-    col1, col2 = st.columns([3, 2])
-
-            # ----------------------------
-        # Tabelas mensais por classe (R5..R1)
+        # ----------------------------
+        # Tabelas MENSAIS por classe (R5..R1)
         # ----------------------------
         st.markdown("---")
         st.subheader(f"📋 Talhões por Classificação — {mes_sel_completo.upper()}")
@@ -321,19 +324,7 @@ else:
                 .reset_index(drop=True)
             )
 
-            cor = R_COLORS_HEX.get(classe, "#999999")
-            st.markdown(
-                f"""
-                <div style="display:flex; align-items:center; gap:10px; margin: 18px 0 8px 0;">
-                  <span style="background:{cor}; color:white; padding:6px 10px; border-radius:10px;
-                               font-weight:700; font-size:16px;">{classe}</span>
-                  <span style="font-size:22px; font-weight:800; line-height:1;">
-                    — {R_RISK_MAP.get(classe, '')}
-                  </span>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
+            titulo_badge(classe, R_RISK_MAP.get(classe, ""), tamanho_texto_px=22)
 
             if df_classe_mes.empty:
                 st.info(f"Não há talhões classificados como {classe} em {mes_sel_completo.upper()}.")
@@ -346,6 +337,15 @@ else:
                 })
                 st.dataframe(df_classe_mes, use_container_width=True, hide_index=True)
 
+    # ============================
+    #   Detalhes do Talhão
+    # ============================
+    st.markdown("---")
+    st.subheader(f"Detalhes do Talhão {talhao_sel}:")
+
+    df_talhao = resultado[resultado["talhao"].astype(str) == str(talhao_sel)].copy()
+
+    col1, col2 = st.columns([3, 2])
 
     with col1:
         ordem_meses = MESES_ABREVIADOS
@@ -394,7 +394,10 @@ else:
                         "classe_geral:N",
                         scale=alt.Scale(
                             domain=R_LABELS,
-                            range=[R_COLORS_HEX["R1"], R_COLORS_HEX["R2"], R_COLORS_HEX["R3"], R_COLORS_HEX["R4"], R_COLORS_HEX["R5"]],
+                            range=[
+                                R_COLORS_HEX["R1"], R_COLORS_HEX["R2"],
+                                R_COLORS_HEX["R3"], R_COLORS_HEX["R4"], R_COLORS_HEX["R5"]
+                            ],
                         ),
                         legend=alt.Legend(title="Classe geral"),
                     ),
@@ -459,6 +462,7 @@ else:
                     st.markdown(f"- <span style='color:#ff4b4b'>❌ {nome_bonito}</span>", unsafe_allow_html=True)
         else:
             st.info("Nenhuma variável cadastrada para este talhão.")
+
 
 
 
