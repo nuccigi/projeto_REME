@@ -307,6 +307,46 @@ else:
     df_talhao = resultado[resultado["talhao"].astype(str) == str(talhao_sel)].copy()
     col1, col2 = st.columns([3, 2])
 
+            # ----------------------------
+        # Tabelas mensais por classe (R5..R1)
+        # ----------------------------
+        st.markdown("---")
+        st.subheader(f"📋 Talhões por Classificação — {mes_sel_completo.upper()}")
+
+        for classe in ["R5", "R4", "R3", "R2", "R1"]:
+            df_classe_mes = (
+                df_risco_mensal[df_risco_mensal["classe_mensal"] == classe]
+                .sort_values("score_mensal", ascending=False)
+                .loc[:, ["talhao", "score_mensal", "classe_mensal", "risco_mensal_extenso"]]
+                .reset_index(drop=True)
+            )
+
+            cor = R_COLORS_HEX.get(classe, "#999999")
+            st.markdown(
+                f"""
+                <div style="display:flex; align-items:center; gap:10px; margin: 18px 0 8px 0;">
+                  <span style="background:{cor}; color:white; padding:6px 10px; border-radius:10px;
+                               font-weight:700; font-size:16px;">{classe}</span>
+                  <span style="font-size:22px; font-weight:800; line-height:1;">
+                    — {R_RISK_MAP.get(classe, '')}
+                  </span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            if df_classe_mes.empty:
+                st.info(f"Não há talhões classificados como {classe} em {mes_sel_completo.upper()}.")
+            else:
+                df_classe_mes = df_classe_mes.rename(columns={
+                    "talhao": "Talhão",
+                    "score_mensal": "Score Médio do Mês",
+                    "classe_mensal": "Classe",
+                    "risco_mensal_extenso": "Descrição do Risco"
+                })
+                st.dataframe(df_classe_mes, use_container_width=True, hide_index=True)
+
+
     with col1:
         ordem_meses = MESES_ABREVIADOS
         df_t = df_talhao[df_talhao["mes"].astype(str).str.startswith(tuple(ordem_meses))].copy()
